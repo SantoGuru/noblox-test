@@ -1,65 +1,90 @@
+//import noblox library
 const noblox = require("noblox.js");
+//import express library
 const express = require("express");
-const config = require("dotenv").config().parsed;
+//import dotenv and use config()
+require("dotenv").config();
+//import supabase
+const supabaseClient = require('@supabase/supabase-js');
+//import morgan from 'morgan';
+const morgan = require('morgan');
+//import bodyParser from "body-parser";
+const bodyParser = require('body-parser');
+//import cors and config
+const cors=require("cors");
+const corsOptions ={
+   origin:'*', 
+   credentials:true,    //access-control-allow-credentials:true
+   optionSuccessStatus:200,
+}
+
+const { COOKIE, API_TOKEN, MAX_RANK, PORT } = process.env
 const app = express();
+const supabase = supabaseClient.createClient('https://ckpuianxbtpwllpskxxa.supabase.co',API_TOKEN)
 
-console.log(config);
+app.use(cors(corsOptions)) // Use this after the variable declaration
 
-function sleep(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
+// using morgan for logs
+app.use(morgan('combined'));
+
+app.use(bodyParser.urlencoded({extended: true}));
+app.use(bodyParser.json());
+
 async function startApp() {
-  // You MUST call setCookie() before using any authenticated methods [marked by 🔐]
-  // Replace the parameter in setCookie() with your .ROBLOSECURITY cookie.
-  const currentUser = await noblox.setCookie(`${config.COOKIE}`);
+  const currentUser = await noblox.setCookie(`${COOKIE}`);
   console.log(`Logged in as ${currentUser.UserName} [${currentUser.UserID}]`);
-  // Do everything else, calling functions and the like.
-  //console.log(configJson.BlackList)
-  const playerList = [];
-  const playerBlackList = [];
-  const roles = await noblox.getRoles(13956182);
-  const configJson = require("./config.json");
-
-  for (z in roles) {
-    const playerInRole = await noblox.getPlayers(13956182, roles[z].id);
-    let i = 0;
-    for (x in playerInRole) {
-      playerList[i] = playerInRole[x].userId;
-      i++;
-    }
-  }
-
-  async function invitePlayer(groupid) {
-    let i = 0;
-    let sleeptime = 20
-    for (y in playerList) {
-      console.log(i)
-      if (i==sleeptime){
-        console.log("Dormiu")
-        await require("./functions/sleep")(10000)
-        sleeptime += 20
-      }else{
-      const a = await noblox.getRankInGroup(groupid, playerList[y])
-      if(a>0){
-        playerBlackList.push(playerList[y])
-         console.log(playerBlackList)
-      }
-      i++
-    }
-    }
-  }
-  for (x in configJson.BlackList) {
-    let groupid = configJson.BlackList[x];
-    invitePlayer(groupid);
-  }
+  console.log(await require('./functions/getAllGroupPlayers')(33718360))
+  console.log(await require('./functions/inBlackList_group_check')(await require('./functions/getAllGroupPlayers')(33718360)))
 }
 
-startApp();
 
-//const server = app.listen(config.PORT, function () {
-//    var host = server.address().address
-//   var port = server.address().port
-//  console.log("listen on http://%s:%s", host, port)
-//})
+app.get('/all', async (req, res) => {
+  const {data, error} = await supabase
+      .from('corregpm')
+      .select("*")
+  res.send(data);
+  console.log(`lists all products${data}`);
+});
+
+app.get('/corregpm/:id', async (req, res) => {
+  console.log("id = " + req.params.id);
+  const { data, error } = await supabase
+  .from('corregpm')
+  .select('id') // Selecionar apenas a coluna 'id'
+  .eq('id', req.params.id)
+  .single('id')
+  if (data != null){
+    console.log(true)
+  }
+  res.send(data);
+
+  console.log("retorno "+ data);
+});
+
+app.put('/products/:id', async (req, res) => {
+  const {error} = await supabase
+      .from('corregpm')
+      .select()
+      .eq('id',req.params.id)
+      .update({
+          name: req.body.name,
+          description: req.body.description,
+          price: req.body.price
+      })
+  if (error) {
+      res.send(error);
+  }
+  res.send("updated!!");
+});
+
+
+app.get('/', async (req, res) => {
+  res.send("Hello I am working my friend Supabase <3");
+  startApp()
+});
+
+const server = app.listen(PORT, function () {
+    var host = server.address().address
+    var port = server.address().port
+    console.log(`> Ready on http://localhost:3000`, host, port)
+})
